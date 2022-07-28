@@ -200,6 +200,13 @@ class COCO:
                 return this_category["id"]
         assert category_exist, "category %s not Found" % name
 
+    def total_image_number(self):
+        return len(self.images)
+
+    def total_annotation_number(self):
+        # TODO
+        return len(self.annotations)
+
     def load(self, fp):
         """
         load data from json file
@@ -403,17 +410,31 @@ class COCO:
         print()
 
 
-def voc2coco(image_dirs, annotation_dirs, class_file, data_name, image_target_dir, image_type="jpg", version="1.0", url="", author="",
-             save=True):
+def voc2coco(image_dirs,
+             annotation_dirs,
+             class_file=None,
+             data_name=None,
+             image_target_dir: str = None,
+             image_type="jpg",
+             version="1.0",
+             url="",
+             author="",
+             save=True,
+             coco_dataset: COCO = None):
+
+    assert image_target_dir is not None, "IMAGE TARGET DIR should not be None!"
+
     image_name_list, anno_name_list = get_file_list(image_dirs, annotation_dirs, image_type)
 
-    my_coco_datset = COCO()
-    my_coco_datset.change_info(data_name=data_name, version=version, url=url, author=author)
-    my_coco_datset.add_license(name="FAKE LICENSE", url="")
-    my_coco_datset.load_categories(txt_file_name=class_file)
+    if coco_dataset is None:
+        coco_dataset = COCO()
+        coco_dataset.change_info(data_name=data_name, version=version, url=url, author=author)
+        coco_dataset.add_license(name="FAKE LICENSE", url="")
+        coco_dataset.load_categories(txt_file_name=class_file)
 
-    image_id = 0
-    anno_id = 0
+    image_id = coco_dataset.total_image_number()
+    anno_id = coco_dataset.total_annotation_number()
+
     anno_file_num = len(anno_name_list)
 
     for anno_name in anno_name_list:
@@ -429,7 +450,7 @@ def voc2coco(image_dirs, annotation_dirs, class_file, data_name, image_target_di
             print("\rConverting: %d / %d" % (image_id, anno_file_num), end="")
 
             anno_data = decode_VOC(anno_name)
-            my_coco_datset.add_image(
+            coco_dataset.add_image(
                 image_id=image_id,
                 file_name=image_name,
                 width=anno_data["width"],
@@ -438,17 +459,17 @@ def voc2coco(image_dirs, annotation_dirs, class_file, data_name, image_target_di
             for anno in anno_data["bboxes"]:
                 anno_id += 1
                 bbox = anno["loc"]
-                my_coco_datset.add_annotation(
+                coco_dataset.add_annotation(
                     image_id=image_id,
                     anno_id=anno_id,
-                    category_id=my_coco_datset._get_category_id_by_name(anno["class"]),
+                    category_id=coco_dataset._get_category_id_by_name(anno["class"]),
                     bbox=[bbox[0], bbox[1], bbox[2] - bbox[0], bbox[3] - bbox[1]],
                     iscrowd=int(anno["difficult"])
                 )
     print("\nConvert finished. Images saved to %s" % image_target_dir)
-    my_coco_datset.save(data_name) if save else None
-    my_coco_datset.show_each_category_num()
-    return my_coco_datset
+    coco_dataset.save(data_name) if save else None
+    coco_dataset.show_each_category_num()
+    return coco_dataset
 
 
 def divide_coco_by_image(coco_dataset: COCO, train: float, val: float, save=True):
